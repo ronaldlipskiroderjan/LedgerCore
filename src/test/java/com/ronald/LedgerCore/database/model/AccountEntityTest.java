@@ -151,7 +151,7 @@ class AccountEntityTest {
         OneToOne ownerRelation = ownerField.getAnnotation(OneToOne.class);
         JoinColumn ownerJoinColumn = ownerField.getAnnotation(JoinColumn.class);
 
-        Field userAccountField = UserEntity.class.getDeclaredField("accountEntity");
+        Field userAccountField = UserEntity.class.getDeclaredField("account");
         OneToOne userAccountRelation = userAccountField.getAnnotation(OneToOne.class);
 
         Field entriesField = AccountEntity.class.getDeclaredField("entries");
