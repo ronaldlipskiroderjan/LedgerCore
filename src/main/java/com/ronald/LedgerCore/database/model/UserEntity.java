@@ -12,7 +12,6 @@ import java.util.*;
 @Getter
 @Setter
 @Builder
-@RequiredArgsConstructor
 @NoArgsConstructor
 @AllArgsConstructor
 public class UserEntity implements UserDetails {
@@ -30,6 +29,7 @@ public class UserEntity implements UserDetails {
     @Column(nullable = false, unique = true)
     private String cpf;
 
+    @Builder.Default
     @Column(nullable = false)
     private boolean isActivate = true;
 
@@ -40,7 +40,7 @@ public class UserEntity implements UserDetails {
             joinColumns = @JoinColumn(name = "user_id"),
             inverseJoinColumns = @JoinColumn(name = "role_id")
     )
-    private Set<RoleEntity> roles;
+    private Set<RoleEntity> roles = new HashSet<>();
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {

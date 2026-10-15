@@ -1,5 +1,6 @@
 package com.ronald.LedgerCore.handler;
 
+import org.apache.coyote.BadRequestException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -14,6 +15,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ExceptionDTO(
                 ex.getMessage(),
                 HttpStatus.NOT_FOUND.value()
+        ));
+    }
+
+    @ExceptionHandler(BadRequestException.class)
+    public ResponseEntity<ExceptionDTO> badRequestException(BadRequestException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ExceptionDTO(
+                ex.getMessage(),
+                HttpStatus.BAD_REQUEST.value()
         ));
     }
 

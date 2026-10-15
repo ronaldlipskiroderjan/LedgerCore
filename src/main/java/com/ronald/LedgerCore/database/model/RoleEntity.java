@@ -13,7 +13,6 @@ import java.util.UUID;
 @Getter
 @Setter
 @Builder
-@RequiredArgsConstructor
 @AllArgsConstructor
 @NoArgsConstructor
 public class RoleEntity implements GrantedAuthority {

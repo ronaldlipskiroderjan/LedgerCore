@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -21,17 +22,17 @@ public class AuthController {
 
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
-    public void register(UserRequestDTO dto) throws Exception {
+    public void register(@RequestBody UserRequestDTO dto) throws Exception {
         authService.register(dto);
     }
 
     @PostMapping("/login")
     @ResponseStatus(HttpStatus.CREATED)
-    public TokenResponseDTO login(LoginRequestDTO dto) throws Exception {
+    public TokenResponseDTO login(@RequestBody LoginRequestDTO dto) throws Exception {
         return authService.login(dto);
     }
 
-    @PostMapping("/register")
+    @PostMapping("/refresh")
     @ResponseStatus(HttpStatus.CREATED)
     public TokenResponseDTO refreshToken(Authentication authentication) {
         return authService.refreshToken(authentication);

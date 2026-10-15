@@ -26,6 +26,7 @@ public class AccountEntity {
     )
     private String ownerName;
 
+    @Builder.Default
     @Column(nullable = false)
     private BigDecimal balance = BigDecimal.ZERO;
 
