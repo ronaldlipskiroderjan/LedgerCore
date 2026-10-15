@@ -4,6 +4,7 @@ import com.ronald.LedgerCore.dto.request.LoginRequestDTO;
 import com.ronald.LedgerCore.dto.request.UserRequestDTO;
 import com.ronald.LedgerCore.dto.response.TokenResponseDTO;
 import com.ronald.LedgerCore.service.AuthService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
@@ -22,13 +23,13 @@ public class AuthController {
 
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
-    public void register(@RequestBody UserRequestDTO dto) throws Exception {
+    public void register(@Valid @RequestBody UserRequestDTO dto) throws Exception {
         authService.register(dto);
     }
 
     @PostMapping("/login")
     @ResponseStatus(HttpStatus.CREATED)
-    public TokenResponseDTO login(@RequestBody LoginRequestDTO dto) throws Exception {
+    public TokenResponseDTO login(@Valid @RequestBody LoginRequestDTO dto) throws Exception {
         return authService.login(dto);
     }
 

@@ -47,7 +47,7 @@ public class UserEntity implements UserDetails {
             cascade = CascadeType.ALL,
             orphanRemoval = true
     )
-    private AccountEntity accountEntity;
+    private AccountEntity account;
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
