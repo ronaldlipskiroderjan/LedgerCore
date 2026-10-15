@@ -67,6 +67,7 @@ Status definitions used throughout this document:
 
 - Spring Boot application bootstrap and Maven build.
 - JPA entities for users, roles, accounts, transactions and ledger entries.
+- A mandatory account-owner one-to-one mapping and a bidirectional account/entry association with relationship helper methods.
 - Spring Data repositories for all current entities.
 - Stateless Spring Security configuration, JWT creation/validation and BCrypt password hashing.
 - Controller routes for user registration, login and token refresh.
@@ -146,6 +147,7 @@ The intended financial flow is `Client → Controller → Service → Repository
 ```mermaid
 erDiagram
     USER }o--o{ ROLE : has
+    USER ||--o| ACCOUNT : owns
     ACCOUNT ||--o{ LEDGER_ENTRY : receives
     TRANSACTION ||--o{ LEDGER_ENTRY : groups
 
@@ -162,7 +164,6 @@ erDiagram
     }
     ACCOUNT {
         UUID id
-        string ownerName
         BigDecimal balance
         LocalDateTime createAt
         LocalDateTime updatedAt
@@ -186,18 +187,20 @@ erDiagram
 
 | Entity | Implemented fields and relationships | Status |
 | --- | --- | --- |
-| `AccountEntity` (`accounts`) | UUID identifier, owner name, `BigDecimal` balance defaulting to zero, creation/update timestamps and a lazy one-to-many entry collection. | **In progress** |
+| `AccountEntity` (`accounts`) | UUID identifier, mandatory lazy one-to-one `UserEntity` owner through unique `owner_id`, `BigDecimal` balance defaulting to zero, creation/update timestamps, equality/hash code based on the identifier, and an initialized `Set` of entries mapped by `EntrieEntity.account`. | **In progress** |
 | `TransactionEntity` (`transactions`) | UUID identifier, type (`DEPOSIT` or `TRANSFER`), amount, status (`PENDING`, `COMPLETED` or `FAILED`), creation timestamp and a lazy one-to-many entry collection. | **In progress** |
 | `EntrieEntity` (`ledger_entries`) | UUID identifier, owning account, owning transaction, entry type (`DEBIT` or `CREDIT`), amount and creation timestamp. | **In progress** |
 
-`EntrieEntity` is the current Java class name; its database table is `ledger_entries`. The model expresses the intended association between an account, a transaction and its entries. It does **not** yet guarantee that every transaction produces balanced debits and credits, and no application service currently creates these records.
+`AccountEntity.addEntry` and `removeEntry` keep both sides of the account/entry relationship synchronized. The collection uses `mappedBy = "account"`, making `EntrieEntity.account` the owning side and preventing an unnecessary account-entry join table. `EntrieEntity` is the current Java class name; its database table is `ledger_entries`.
+
+The model still does **not** guarantee that every transaction produces balanced debits and credits, and no application service currently creates these records.
 
 ### Security entities
 
 - `UserEntity` stores a UUID, name, BCrypt-compatible password field, unique CPF identifier, active flag and eagerly loaded roles.
 - `RoleEntity` implements Spring Security's `GrantedAuthority` and has a unique role name.
 - Users and roles are connected through the `user_roles` many-to-many join table.
-- There is currently no relationship between `UserEntity` and `AccountEntity`.
+- `UserEntity.accountEntity` is the inverse side of an optional one-to-one account association (`mappedBy = "owner"`), with cascading and orphan removal. Every persisted account must have exactly one owner, while a user may exist without an account.
 
 ## Technology stack
 
@@ -325,7 +328,9 @@ The current persistence model provides:
 - non-null columns for the main entity fields;
 - unique constraints for user CPF and role name;
 - a `user_roles` join table;
+- a unique, non-null `accounts.owner_id` foreign key, modeling at most one account per user;
 - associations from a ledger entry to one account and one transaction;
+- an account-side entry collection mapped through the existing `ledger_entries.account_id` foreign key;
 - enum persistence as readable strings;
 - repositories for accounts, transactions and entries.
 
@@ -337,7 +342,8 @@ Important current limitations:
 - Amount positivity, monetary precision/scale and balanced-entry invariants are not enforced.
 - Transaction and entry entities model a future history, but no service currently records it.
 - Entity timestamps must currently be populated by application code; there are no persistence lifecycle callbacks or auditing configuration.
-- The account/transaction entry collections do not declare `mappedBy`; their generated relational mapping should be reviewed before the ledger schema is treated as final.
+- `TransactionEntity.entries` still does not declare `mappedBy = "transaction"`; that side of the generated relational mapping should be reviewed before the ledger schema is treated as final.
+- `AccountsRepository.existsByOwnerName(...)`, `AccountRequestDTO` and `AccountResponseDTO` still refer to the previous `ownerName` model and must be aligned with the new `UserEntity owner` relationship before account endpoints are implemented.
 - No Flyway or Liquibase migrations are present.
 
 ## Getting started
@@ -412,15 +418,15 @@ No Docker Compose workflow exists yet; PostgreSQL must be provided separately.
 
 ## Testing strategy
 
-The repository currently contains eight test methods across three classes:
+The repository currently contains 13 test methods across three classes:
 
 | Test class | What it verifies | Test type |
 | --- | --- | --- |
 | `LedgerCoreApplicationTests` | The Spring application context can load with the test-scoped H2 database. | Spring context test |
 | `AuthControllerTest` | Registration delegates the expected DTO and returns `201`; login and refresh return the token contract. `AuthService` is mocked. | Standalone MockMvc/controller unit test |
-| `AccountEntityTest` | Builder field preservation, zero default balance, no-args initialization and mutable setters. | Unit test |
+| `AccountEntityTest` | Nine tests covering builder/setter behavior, zero balance, non-null empty entry sets, bidirectional add/remove helpers and reflection-based validation of the user/account and account/entry JPA mappings. | Unit and mapping regression tests |
 
-The latest test record stored in [`docs/Historico_de_Testes_LedgerCore.docx`](./docs/Historico_de_Testes_LedgerCore.docx) reports **8 executed and 8 passed** on October 14, 2026. It also records a regression test for the account builder's default zero balance.
+The latest test record stored in [`docs/Historico_de_Testes_LedgerCore.docx`](./docs/Historico_de_Testes_LedgerCore.docx) reports **13 executed and 13 passed** on October 14, 2026. Besides the default-zero-balance regression, it records verification that the corrected mappings generate a single `owner_id` foreign key and no `accounts_entries` join table.
 
 The current tests do **not** validate real registration/login persistence, financial operations, insufficient funds, rollback, double-entry balancing, idempotency or concurrent execution. Those scenarios belong to future service and integration test suites.
 
@@ -428,6 +434,8 @@ The current tests do **not** validate real registration/login persistence, finan
 
 - **`BigDecimal` for monetary values.** Accounts, transactions and entries avoid binary floating-point values. Precision, rounding and positivity rules still need an explicit domain policy.
 - **UUID identifiers.** Current entities use database-generated UUIDs, avoiding sequential public identifiers and allowing identifiers to be created without a central numeric sequence.
+- **Entity ownership instead of a duplicated owner name.** An account references its `UserEntity` through a unique, mandatory foreign key. This gives the ownership relationship an explicit identity and prevents multiple accounts for the same user at the database level.
+- **Bidirectional relationship helpers.** Account entries use an initialized `Set`, `mappedBy` and `addEntry`/`removeEntry` methods to keep the in-memory entity graph consistent while retaining a single relational owning side.
 - **Layered responsibilities.** Controllers define HTTP behavior, services coordinate authentication, repositories abstract persistence and entities model stored state. The same separation is intended for the financial use cases.
 - **Stateless JWT authentication.** Spring Security uses a `OncePerRequestFilter`, signed tokens and `SessionCreationPolicy.STATELESS`; passwords are encoded with BCrypt.
 - **Relational persistence.** PostgreSQL and JPA are a suitable foundation for local transactional guarantees and integrity constraints. Explicit transaction boundaries and concurrency policies still need to be added.

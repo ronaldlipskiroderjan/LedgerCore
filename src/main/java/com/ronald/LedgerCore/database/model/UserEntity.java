@@ -42,6 +42,13 @@ public class UserEntity implements UserDetails {
     )
     private Set<RoleEntity> roles = new HashSet<>();
 
+    @OneToOne(
+            mappedBy = "owner",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true
+    )
+    private AccountEntity accountEntity;
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return roles;
