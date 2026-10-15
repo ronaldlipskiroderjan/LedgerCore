@@ -445,16 +445,17 @@ mvn test
 
 ## Testing strategy
 
-The repository currently contains 16 test methods across four classes:
+The repository currently contains 18 test methods across five classes:
 
 | Test class | What it verifies | Test type |
 | --- | --- | --- |
 | `LedgerCoreApplicationTests` | The Spring application context can load with the test-scoped H2 database. | Spring context test |
 | `DockerConfigurationTest` | The Compose YAML is parseable and includes the application, healthy PostgreSQL dependency, persistent volume and externalized settings; it also checks the Java 21 multi-stage/non-root Dockerfile contract. | Infrastructure configuration test |
 | `AuthControllerTest` | Registration delegates the expected DTO and returns `201`; login and refresh return the token contract. `AuthService` is mocked. | Standalone MockMvc/controller unit test |
+| `AccountControllerTest` | The authenticated account lookup returns `200` with the complete response contract, delegates the current authentication and propagates lookup failures. `AccountService` is mocked. | Standalone MockMvc/controller unit test |
 | `AccountEntityTest` | Nine tests covering builder/setter behavior, zero balance, non-null empty entry sets, bidirectional add/remove helpers and reflection-based validation of the user/account and account/entry JPA mappings. | Unit and mapping regression tests |
 
-The latest test record stored in [`docs/Historico_de_Testes_LedgerCore.docx`](./docs/Historico_de_Testes_LedgerCore.docx) reports **16 executed and 16 passed** on October 14, 2026. Besides the domain regressions, it records validation of the Docker, Compose, PostgreSQL and externalized configuration contracts.
+The AccountController scenarios, methods and their expected and observed results are documented exclusively in [`docs/Historico_de_Testes_LedgerCore.docx`](./docs/Historico_de_Testes_LedgerCore.docx). The latest record reports **18 executed and 18 passed** on October 15, 2026. Besides the controller and domain regressions, it records validation of the Docker, Compose, PostgreSQL and externalized configuration contracts.
 
 The current tests do **not** validate real registration/login persistence, financial operations, insufficient funds, rollback, double-entry balancing, idempotency or concurrent execution. Those scenarios belong to future service and integration test suites.
 
