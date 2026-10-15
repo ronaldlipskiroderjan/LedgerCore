@@ -3,14 +3,14 @@ spring:
     name: LedgerCore
 
   datasource:
-    url:
-    password:
-    username:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/ledgercore}
+    username: ${SPRING_DATASOURCE_USERNAME:ledgercore}
+    password: ${SPRING_DATASOURCE_PASSWORD:ledgercore_dev_password}
   jpa:
     hibernate:
-      ddl-auto: create-drop
-    show-sql: on
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
+    show-sql: ${SPRING_JPA_SHOW_SQL:false}
 
 jwt:
-  expiration: 900000
-  key: 12c9d4eaca1ff82559e6ff0d67f4e394d4f43543a9f20c6a22b15d3e4fb8dbbf
+  expiration: ${JWT_EXPIRATION:900000}
+  key: ${JWT_KEY:development-only-change-this-jwt-key-before-deploying}

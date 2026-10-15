@@ -320,7 +320,7 @@ However, the current security policy permits only `/v1/auth/**` and requires aut
 
 ## Database and consistency
 
-PostgreSQL is the runtime database selected by the Maven dependency. The application configuration leaves the datasource URL, username and password empty so that each environment can supply its own values.
+PostgreSQL is the runtime database selected by the Maven dependency. Datasource and JWT properties are externalized through environment variables; `application.yaml` supplies development defaults, while `compose.yaml` connects the application to the PostgreSQL service by its Compose hostname.
 
 The current persistence model provides:
 
@@ -336,7 +336,7 @@ The current persistence model provides:
 
 Important current limitations:
 
-- `spring.jpa.hibernate.ddl-auto` is set to `create-drop`; Hibernate recreates the schema for a run and drops it on shutdown. This is development behavior, not a production migration strategy.
+- `spring.jpa.hibernate.ddl-auto` defaults to `update` for local development. Production should override it and use versioned Flyway or Liquibase migrations instead of relying on Hibernate schema mutation.
 - No `@Transactional` annotation is present in the current codebase. Multi-record financial atomicity is therefore not implemented.
 - No database or JPA locking strategy protects balances from concurrent writes.
 - Amount positivity, monetary precision/scale and balanced-entry invariants are not enforced.
@@ -351,9 +351,8 @@ Important current limitations:
 ### Prerequisites
 
 - Git
-- JDK 21
-- Maven 3.x available as `mvn` — this repository does not include Maven Wrapper scripts
-- A running PostgreSQL instance
+- Docker Engine with Docker Compose v2 for the recommended workflow
+- Alternatively, JDK 21, Maven 3.x and a local PostgreSQL instance
 
 ### 1. Clone the repository
 
@@ -362,20 +361,52 @@ git clone https://github.com/ronaldlipskiroderjan/LedgerCore.git
 cd LedgerCore
 ```
 
-### 2. Create a local PostgreSQL database
+### 2. Configure local Docker variables
 
-Run the following as a PostgreSQL administrator, replacing the placeholder password:
+The Compose file has development defaults, so this step is optional. To use your own local credentials and signing key:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` before starting the stack. The file is ignored by Git. Never reuse development credentials or JWT keys in a deployed environment.
+
+### 3. Start the application and PostgreSQL
+
+```bash
+docker compose up --build
+```
+
+Compose builds the Java 21 application image, starts PostgreSQL 18, waits for `pg_isready` to report a healthy database and then starts LedgerCore. The API is available at `http://localhost:8080`; PostgreSQL is exposed only on `127.0.0.1:5432` by default.
+
+Useful commands:
+
+```bash
+# Run in the background
+docker compose up --build -d
+
+# Follow application logs
+docker compose logs -f app
+
+# Stop containers while preserving database data
+docker compose down
+
+# Stop containers and remove the PostgreSQL volume
+docker compose down -v
+```
+
+The last command permanently removes the local database volume.
+
+### 4. Run without Docker (alternative)
+
+Create a local PostgreSQL database as an administrator, replacing the placeholder password:
 
 ```sql
 CREATE USER ledgercore WITH PASSWORD '<local-password>';
 CREATE DATABASE ledgercore OWNER ledgercore;
 ```
 
-Because the current Hibernate mode is `create-drop`, the application creates its development schema at startup and removes it at shutdown.
-
-### 3. Configure the environment
-
-Spring Boot environment variables can override the empty datasource properties and the development JWT settings in `application.yaml`:
+Configure the environment:
 
 ```bash
 export SPRING_DATASOURCE_URL='jdbc:postgresql://localhost:5432/ledgercore'
@@ -386,8 +417,6 @@ export JWT_EXPIRATION='900000'
 ```
 
 Do not reuse the development signing key from the repository in a deployed environment. Keep real credentials and secrets outside version control.
-
-### 4. Run the application
 
 ```bash
 mvn spring-boot:run
@@ -414,19 +443,18 @@ The current controller contract returns `HTTP/1.1 201` with an empty body when r
 mvn test
 ```
 
-No Docker Compose workflow exists yet; PostgreSQL must be provided separately.
-
 ## Testing strategy
 
-The repository currently contains 13 test methods across three classes:
+The repository currently contains 16 test methods across four classes:
 
 | Test class | What it verifies | Test type |
 | --- | --- | --- |
 | `LedgerCoreApplicationTests` | The Spring application context can load with the test-scoped H2 database. | Spring context test |
+| `DockerConfigurationTest` | The Compose YAML is parseable and includes the application, healthy PostgreSQL dependency, persistent volume and externalized settings; it also checks the Java 21 multi-stage/non-root Dockerfile contract. | Infrastructure configuration test |
 | `AuthControllerTest` | Registration delegates the expected DTO and returns `201`; login and refresh return the token contract. `AuthService` is mocked. | Standalone MockMvc/controller unit test |
 | `AccountEntityTest` | Nine tests covering builder/setter behavior, zero balance, non-null empty entry sets, bidirectional add/remove helpers and reflection-based validation of the user/account and account/entry JPA mappings. | Unit and mapping regression tests |
 
-The latest test record stored in [`docs/Historico_de_Testes_LedgerCore.docx`](./docs/Historico_de_Testes_LedgerCore.docx) reports **13 executed and 13 passed** on October 14, 2026. Besides the default-zero-balance regression, it records verification that the corrected mappings generate a single `owner_id` foreign key and no `accounts_entries` join table.
+The latest test record stored in [`docs/Historico_de_Testes_LedgerCore.docx`](./docs/Historico_de_Testes_LedgerCore.docx) reports **16 executed and 16 passed** on October 14, 2026. Besides the domain regressions, it records validation of the Docker, Compose, PostgreSQL and externalized configuration contracts.
 
 The current tests do **not** validate real registration/login persistence, financial operations, insufficient funds, rollback, double-entry balancing, idempotency or concurrent execution. Those scenarios belong to future service and integration test suites.
 
