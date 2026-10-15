@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: LedgerCore
+
+  datasource:
+    url:
+    password:
+    username:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: on
+
+jwt:
+  expiration: 900000
+  key: 12c9d4eaca1ff82559e6ff0d67f4e394d4f43543a9f20c6a22b15d3e4fb8dbbf
